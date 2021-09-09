@@ -48,7 +48,7 @@ def ff_multiply(a, b):
     # add needed xtime vals to a list
     for val in times:
         if b & bit == bit:
-            adds.append(times)
+            adds.append(val)
         
         bit = bit << 1
 
