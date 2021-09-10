@@ -1,18 +1,20 @@
+import copy
+
 # public vals
-r_con = [  0x00000000, 
-           0x01000000, 0x02000000, 0x04000000, 0x08000000, 
-           0x10000000, 0x20000000, 0x40000000, 0x80000000, 
-           0x1B000000, 0x36000000, 0x6C000000, 0xD8000000, 
-           0xAB000000, 0x4D000000, 0x9A000000, 0x2F000000, 
-           0x5E000000, 0xBC000000, 0x63000000, 0xC6000000, 
-           0x97000000, 0x35000000, 0x6A000000, 0xD4000000, 
-           0xB3000000, 0x7D000000, 0xFA000000, 0xEF000000, 
-           0xC5000000, 0x91000000, 0x39000000, 0x72000000, 
-           0xE4000000, 0xD3000000, 0xBD000000, 0x61000000, 
-           0xC2000000, 0x9F000000, 0x25000000, 0x4A000000, 
-           0x94000000, 0x33000000, 0x66000000, 0xCC000000, 
-           0x83000000, 0x1D000000, 0x3A000000, 0x74000000, 
-           0xE8000000, 0xCB000000, 0x8D000000]
+r_con = [  "00000000", 
+           "01000000", "02000000", "04000000", "08000000", 
+           "10000000", "20000000", "40000000", "80000000", 
+           "1B000000", "36000000", "6C000000", "D8000000", 
+           "AB000000", "4D000000", "9A000000", "2F000000", 
+           "5E000000", "BC000000", "63000000", "C6000000", 
+           "97000000", "35000000", "6A000000", "D4000000", 
+           "B3000000", "7D000000", "FA000000", "EF000000", 
+           "C5000000", "91000000", "39000000", "72000000", 
+           "E4000000", "D3000000", "BD000000", "61000000", 
+           "C2000000", "9F000000", "25000000", "4A000000", 
+           "94000000", "33000000", "66000000", "CC000000", 
+           "83000000", "1D000000", "3A000000", "74000000", 
+           "E8000000", "CB000000", "8D000000"]
 
 s_box = [
     [ 0x63, 0x7c, 0x77, 0x7b, 0xf2, 0x6b, 0x6f, 0xc5, 0x30, 0x01, 0x67, 0x2b, 0xfe, 0xd7, 0xab, 0x76 ] ,
@@ -51,6 +53,24 @@ inv_s_box = [
     [ 0xa0, 0xe0, 0x3b, 0x4d, 0xae, 0x2a, 0xf5, 0xb0, 0xc8, 0xeb, 0xbb, 0x3c, 0x83, 0x53, 0x99, 0x61 ] ,
     [ 0x17, 0x2b, 0x04, 0x7e, 0xba, 0x77, 0xd6, 0x26, 0xe1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0c, 0x7d ]
     ]
+
+# vars for testing
+test_key = [ 0x2b, 0x7e, 0x15, 0x16, 0x28, 0xae, 0xd2, 0xa6,
+            0xab, 0xf7, 0x15, 0x88, 0x09, 0xcf, 0x4f, 0x3c ]
+
+test_expanded = [ "0x2b7e1516", "0x28aed2a6", "0xabf71588", "0x09cf4f3c",
+                "0xa0fafe17", "0x88542cb1", "0x23a33939", "0x2a6c7605",
+                "0xf2c295f2", "0x7a96b943", "0x5935807a", "0x7359f67f",
+                "0x3d80477d", "0x4716fe3e", "0x1e237e44", "0x6d7a883b",
+                "0xef44a541", "0xa8525b7f", "0xb671253b", "0xdb0bad00",
+                "0xd4d1c6f8", "0x7c839d87", "0xcaf2b8bc", "0x11f915bc",
+                "0x6d88a37a", "0x110b3efd", "0xdbf98641", "0xca0093fd",
+                "0x4e54f70e", "0x5f5fc9f3", "0x84a64fb2", "0x4ea6dc4f",
+                "0xead27321", "0xb58dbad2", "0x312bf560", "0x7f8d292f",
+                "0xac7766f3", "0x19fadc21", "0x28d12941", "0x575c006e",
+                "0xd014f9a8", "0xc9ee2589", "0xe13f0cc8", "0xb6630ca6" ]
+
+test_w = [None] * 44
 
 
 # takes a state and uses ff_multiply() to perform the matrix multiplication
@@ -117,13 +137,16 @@ def ff_multiply(a, b):
 
 def sub_word(word):
     for i in range(len(word)):
-        word[i] = s_box[word >> 4][word & 0x0f]
+        tmp = word[i]
+        word[i] = s_box[tmp >> 4][tmp & 0x0f]
 
     return word
 
 
 def rot_word(word):
     tmp_front = word[0]
+    #print(tmp_front)
+    #print(len(word))
     for i in range(len(word) - 1):
         word[i] = word[i+1]
 
@@ -133,24 +156,56 @@ def rot_word(word):
     return word
 
 
-def key_expansion(key, w, n):
-    for i in range(n):
-        w[i] = [key[4*i], key[4*i+1], key[4*i+2], key[4*i+3]]
+def xor_bytearr(a, b):
+    c = bytearray()
+    for i in range(len(a)):
+        c.append(a[i] ^ b[i])
 
-    for i in range(len(w)):
-        temp = w[i-1]
+    return c
+
+
+# n = 4 in our case
+def key_expansion(key, w, n=4):
+    for i in range(n):
+        w[i] = bytearray([key[4*i], key[4*i+1], key[4*i+2], key[4*i+3]])
+
+    for i in range(n, len(w)):
+        temp = copy.deepcopy(w[i-1])
         if i % n == 0:
-            temp = sub_word(rot_word(temp)) ^ r_con[i/n]
+            temp = xor_bytearr(sub_word(rot_word(temp)), bytearray.fromhex(r_con[i//n]))
         elif n > 6 and i % n == 4:
             temp = sub_word(temp)
         
-        w[i] = w[i-n] ^ temp
+        w[i] = xor_bytearr(w[i-n], temp)
 
+    return w
 
 
 
 def main():
-    
+    byarr = bytearray()
+    byarr.append(0x40)
+    byarr.append(0x50)
+    byarr.append(0x60)
+    byarr.append(0x70)
+
+    print(byarr.hex())
+    print(sub_word(byarr).hex())
+
+    help = bytearray.fromhex(r_con[2])
+    help2 = bytearray.fromhex("09cf4f3c")
+    xor = xor_bytearr(help, help2)
+    print("xored hex: \n")
+    print(xor.hex())
+    print("bytearray to hex: \n")
+    print(help.hex())
+
+    print("given: \n")
+    print(test_expanded)
+    print("new: \n")
+    new_key = key_expansion(test_key, test_w)
+    for key in new_key:
+        print(key.hex())
     
     return 0 
 
