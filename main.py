@@ -72,6 +72,11 @@ test_expanded = [ "0x2b7e1516", "0x28aed2a6", "0xabf71588", "0x09cf4f3c",
 
 test_w = [None] * 44
 
+test_state = [[0x19,0xa0,0x9a,0xe9],
+                [0x3d,0xf4,0xc6,0xf8],
+                [0xe3,0xe2,0x8d,0x48],
+                [0xbe,0x2b,0x2a,0x08]]
+
 
 # takes a state and uses ff_multiply() to perform the matrix multiplication
 def mix_columns(state):
@@ -181,6 +186,36 @@ def key_expansion(key, w, n=4):
     return w
 
 
+def sub_bytes(state):
+    for i in range(len(state)):
+        for j in range(len(state[i])):
+            tmp = state[i][j]
+            state[i][j] = s_box[tmp >> 4][tmp & 0x0f]
+
+    return state
+
+
+def cipher(inn, out, w):
+    state = inn
+
+    add_round_key(state, w)
+
+    for i in range(1, nr - 1):
+        sub_bytes(state)
+        shift_rows(state)
+        mix_columns(state)
+        add_round_key(state, w)
+
+    sub_bytes(state)
+    shift_rows(state)
+    add_round_key(state, w)
+
+    out = state
+
+    return out
+
+
+
 
 def main():
     byarr = bytearray()
@@ -206,6 +241,13 @@ def main():
     new_key = key_expansion(test_key, test_w)
     for key in new_key:
         print(key.hex())
+
+    print("sub_bytes_test: \n")
+    new_state = sub_bytes(test_state)
+    for i in range(len(new_state)):
+        for j in range(len(new_state[i])):
+            print(new_state[i][j])
+
     
     return 0 
 
