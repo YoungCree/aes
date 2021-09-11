@@ -195,6 +195,17 @@ def sub_bytes(state):
     return state
 
 
+def shift_rows(state):
+    for i in range(1, len(state)):
+        tmp = copy.copy(state[i])
+        for j in range(len(state[i])):
+            if j + i >= len(state[i]):
+                state[i][j] = tmp[j+i-len(state[i])]
+            state[i][j] = tmp[j+i]
+
+    return state           
+
+
 def cipher(inn, out, w):
     state = inn
 
