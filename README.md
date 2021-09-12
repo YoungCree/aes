@@ -9,3 +9,7 @@ Enter plain text to be encrypted/decrypted<br>
 Enter key<br>
 Enter key length (128, 192, 256)<br>
 Choose encryption or decryption (e/d)<br>
+
+## Submission Requirements
+Statement: I only used the given aes materials to code up the lab
+Statement: I pass all of the test cases in Appendix C of fips 197
