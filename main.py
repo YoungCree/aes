@@ -381,7 +381,15 @@ def print_state(state):
     print("\n\n")
 
 
-def testing():
+def print_hex_pretty(state):
+    for i in range(len(state)):
+        for j in range(len(state[i])):
+            print(str(hex(state[j][i]).split('x')[-1]).zfill(2), end="")
+
+    print("\n")
+
+
+def test_cases():
     # byarr = bytearray()
     # byarr.append(0x40)
     # byarr.append(0x50)
@@ -446,14 +454,6 @@ def testing():
             print(result[i][j])
 
 
-def print_hex_pretty(state):
-    for i in range(len(state)):
-        for j in range(len(state[i])):
-            print(str(hex(state[j][i]).split('x')[-1]).zfill(2), end="")
-
-    print("\n")
-
-
 def main():
     in_user = input("Enter text to encrypt or decrypt: ")
     in_key = input("Enter your key: ")
@@ -488,14 +488,8 @@ def main():
     else:
         result = inv_cipher(state, w, in_key_size)
 
-    result_hex = list()
-    for i in range(len(result)):
-        for j in range(len(result[i])):
-            result_hex.append(hex(result[j][i]).split('x')[-1])
-
-    for h in result_hex:
-        print(str(h).zfill(2), end="")
-    print("\n")
+    print("result: ")
+    print_hex_pretty(result)
 
 
 if __name__=="__main__":
