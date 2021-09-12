@@ -1,4 +1,5 @@
 import copy
+import sys
 
 # public vals
 r_con = [  "00000000", 
@@ -54,6 +55,10 @@ inv_s_box = [
     [ 0x17, 0x2b, 0x04, 0x7e, 0xba, 0x77, 0xd6, 0x26, 0xe1, 0x69, 0x14, 0x63, 0x55, 0x21, 0x0c, 0x7d ]
     ]
 
+nr = 10 #changes based on key length
+nb = 4
+nk = 4 #changes
+
 # vars for testing
 test_key = [ 0x2b, 0x7e, 0x15, 0x16, 0x28, 0xae, 0xd2, 0xa6,
             0xab, 0xf7, 0x15, 0x88, 0x09, 0xcf, 0x4f, 0x3c ]
@@ -70,25 +75,29 @@ test_expanded = [ "0x2b7e1516", "0x28aed2a6", "0xabf71588", "0x09cf4f3c",
                 "0xac7766f3", "0x19fadc21", "0x28d12941", "0x575c006e",
                 "0xd014f9a8", "0xc9ee2589", "0xe13f0cc8", "0xb6630ca6" ]
 
-test_w = [None] * 44
+test_w = [None] * (nb * (nr+1))
 
 test_state = [[0x19,0xa0,0x9a,0xe9],
                 [0x3d,0xf4,0xc6,0xf8],
                 [0xe3,0xe2,0x8d,0x48],
                 [0xbe,0x2b,0x2a,0x08]]
 
+test_inn = [ 0x32, 0x43, 0xf6, 0xa8, 0x88, 0x5a, 0x30, 0x8d,
+                    0x31, 0x31, 0x98, 0xa2, 0xe0, 0x37, 0x07, 0x34 ]
+
+# functions...
 
 # takes a state and uses ff_multiply() to perform the matrix multiplication
 def mix_columns(state):
     # make a copy of state
-    tmp = [row[:] for row in state]
+    tmp = copy.deepcopy(state)
 
     # perform matrix multiplication using ff_multiply()
     for i in range(4):
-        state[0, i] = ff_multiply(0x02, tmp[0, i]) ^ ff_multiply(0x03, tmp[1, i]) ^ tmp[2, i] ^ tmp[3, i]
-        state[1, i] = tmp[0, i] ^ ff_multiply(0x02, tmp[1, i]) ^ ff_multiply(0x03, tmp[2, i]) ^ tmp[3, i]
-        state[2, i] = tmp[0, i] ^ tmp[1, i] ^ ff_multiply(0x02, tmp[2, i]) ^ ff_multiply(0x03, tmp[3, i])
-        state[3, i] = ff_multiply(0x03, tmp[0, i]) ^ tmp[1, i] ^ tmp[2, i] ^ ff_multiply(0x02, tmp[3, i])
+        state[0][i] = ff_multiply(0x02, tmp[0][i]) ^ ff_multiply(0x03, tmp[1][i]) ^ tmp[2][i] ^ tmp[3][i]
+        state[1][i] = tmp[0][i] ^ ff_multiply(0x02, tmp[1][i]) ^ ff_multiply(0x03, tmp[2][i]) ^ tmp[3][i]
+        state[2][i] = tmp[0][i] ^ tmp[1][i] ^ ff_multiply(0x02, tmp[2][i]) ^ ff_multiply(0x03, tmp[3][i])
+        state[3][i] = ff_multiply(0x03, tmp[0][i]) ^ tmp[1][i] ^ tmp[2][i] ^ ff_multiply(0x02, tmp[3][i])
     
     
     return state
@@ -132,7 +141,10 @@ def ff_multiply(a, b):
         bit = bit << 1
 
     # xor (add) the xtime vals (found above) together
-    ret = adds[0]
+    if len(adds) > 0:
+        ret = adds[0]
+    else:
+        return 0
     for i in range(1, len(adds)):
         ret = ret ^ adds[i]
 
@@ -204,70 +216,286 @@ def shift_rows(state):
             else:
                 state[i][j] = tmp[j+i]
 
-    return state           
+    return state   
 
 
-def cipher(inn, out, w):
-    state = inn
+def add_round_key(state, w):
+    for i in range(len(state)):
+        for j in range(len(state[i])):
+            state[i][j] = state[i][j] ^ w[j][i]
 
-    add_round_key(state, w)
+    return state
 
-    for i in range(1, nr - 1):
+
+def cipher(inn, w, in_key_size):
+    state = copy.deepcopy(inn)
+
+    if in_key_size == "128":
+        nk = 4
+        nr = 10
+    elif in_key_size == "192":
+        nk = 6
+        nr = 12
+    elif in_key_size == "256":
+        nk = 8
+        nr = 14
+
+    print("round 0: ")
+    print_hex_pretty(state)
+
+    add_round_key(state, w[0:nb])
+    print("round 0 add_round_key: ")
+    print_hex_pretty(state)
+
+
+    for i in range(1, nr):
         sub_bytes(state)
+        print("round {} sub_bytes: ".format(i))
+        print_hex_pretty(state)
+
         shift_rows(state)
+        print("round {} shift_rows: ".format(i))
+        print_hex_pretty(state)
+
         mix_columns(state)
-        add_round_key(state, w)
+        print("round {} mix_columns: ".format(i))
+        print_hex_pretty(state)
+
+        add_round_key(state, w[i*nb:(i+1)*nb])
+        print("round {} add_round_key: ".format(i))
+        print_hex_pretty(state)
 
     sub_bytes(state)
+    print("round {} sub_bytes: ".format(nr))
+    print_hex_pretty(state)
+
     shift_rows(state)
-    add_round_key(state, w)
+    print("round {} shift_rows: ".format(nr))
+    print_hex_pretty(state)
+
+    add_round_key(state, w[nr*nb:(nr+1)*nb])
+    print("round {} add_round_key: ".format(nr))
+    print_hex_pretty(state)
 
     out = state
 
     return out
 
 
+def inv_mix_columns(state):
+    # make a copy of state
+    tmp = copy.deepcopy(state)
+
+    # perform matrix multiplication using ff_multiply()
+    for i in range(4):
+        state[0][i] = ff_multiply(0x0e, tmp[0][i]) ^ ff_multiply(0x0b, tmp[1][i]) ^ ff_multiply(0x0d, tmp[2][i]) ^ ff_multiply(0x09, tmp[3][i])
+        state[1][i] = ff_multiply(0x09, tmp[0][i]) ^ ff_multiply(0x0e, tmp[1][i]) ^ ff_multiply(0x0b, tmp[2][i]) ^ ff_multiply(0x0d, tmp[3][i])
+        state[2][i] = ff_multiply(0x0d, tmp[0][i]) ^ ff_multiply(0x09, tmp[1][i]) ^ ff_multiply(0x0e, tmp[2][i]) ^ ff_multiply(0x0b, tmp[3][i])
+        state[3][i] = ff_multiply(0x0b, tmp[0][i]) ^ ff_multiply(0x0d, tmp[1][i]) ^ ff_multiply(0x09, tmp[2][i]) ^ ff_multiply(0x0e, tmp[3][i])
+    
+    
+    return state
+
+
+def inv_shift_rows(state):
+    for i in range(1, len(state)):
+        tmp = copy.copy(state[i])
+        for j in range(len(state[i])-1, -1, -1):
+            if (j - i) < 0:
+                state[i][j] = tmp[len(state) - i + j]
+            else:
+                state[i][j] = tmp[j-i]
+
+    return state   
+
+
+def inv_sub_bytes(state):
+    for i in range(len(state)):
+        for j in range(len(state[i])):
+            tmp = state[i][j]
+            state[i][j] = inv_s_box[tmp >> 4][tmp & 0x0f]
+
+    return state
+
+
+def inv_cipher(inn, w, in_key_size):
+    state = copy.deepcopy(inn)
+
+    if in_key_size == "128":
+        nk = 4
+        nr = 10
+    elif in_key_size == "192":
+        nk = 6
+        nr = 12
+    elif in_key_size == "256":
+        nk = 8
+        nr = 14
+
+    print("round 0: ")
+    print_hex_pretty(state)
+
+    add_round_key(state, w[nr*nb:(nr+1)*nb])
+    print("round 0 add_round_key: ")
+    print_hex_pretty(state)
+
+    for i in range(nr-1, 0, -1):
+        inv_shift_rows(state)
+        print("round {} inv_shift_rows: ".format(i))
+        print_hex_pretty(state)
+
+        inv_sub_bytes(state)
+        print("round {} inv_sub_bytes: ".format(i))
+        print_hex_pretty(state)
+
+        add_round_key(state, w[i*nb:(i+1)*nb])
+        print("round {} add_round_key: ".format(i))
+        print_hex_pretty(state)
+
+        inv_mix_columns(state)
+        print("round {} inv_mix_columns: ".format(i))
+        print_hex_pretty(state)
+
+    inv_shift_rows(state)
+    print("round {} inv_shift_rows: ".format(nr))
+    print_hex_pretty(state)
+
+    inv_sub_bytes(state)
+    print("round {} inv_sub_bytes: ".format(nr))
+    print_hex_pretty(state)
+
+    add_round_key(state, w[0:nb])
+    print("round {} add_round_key: ".format(nr))
+    print_hex_pretty(state)
+
+    out = state
+
+    return out
+
+
+def print_state(state):
+    print("current state:\n")
+    for i in range(len(state)):
+        for j in range(len(state[i])):
+            print(state[i][j])
+
+    print("\n\n")
+
+
+def testing():
+    # byarr = bytearray()
+    # byarr.append(0x40)
+    # byarr.append(0x50)
+    # byarr.append(0x60)
+    # byarr.append(0x70)
+
+    # print(byarr.hex())
+    # print(sub_word(byarr).hex())
+
+    # help = bytearray.fromhex(r_con[2])
+    # help2 = bytearray.fromhex("09cf4f3c")
+    # xor = xor_bytearr(help, help2)
+    # print("xored hex: \n")
+    # print(xor.hex())
+    # print("bytearray to hex: \n")
+    # print(help.hex())
+
+    # print("given: \n")
+    # print(test_expanded)
+    # print("new: \n")
+    # new_key = key_expansion(test_key, test_w)
+    # for key in new_key:
+    #     print(key.hex())
+
+    # print("sub_bytes_test: \n")
+    # new_state = sub_bytes(test_state)
+    # for i in range(len(new_state)):
+    #     for j in range(len(new_state[i])):
+    #         print(new_state[i][j])
+
+    # print("shift_bytes_test: \n")
+    # new_state = shift_rows(new_state)
+    # for i in range(len(new_state)):
+    #     for j in range(len(new_state[i])):
+    #         print(new_state[i][j])
+
+    # print("mix_columns_test: \n")
+    # new_state = mix_columns(new_state)
+    # for i in range(len(new_state)):
+    #     for j in range(len(new_state[i])):
+    #         print(new_state[i][j])
+
+    # print("round_key_test after first round: \n")
+    # newer_state = add_round_key(new_state, new_key[4:8])
+    # for i in range(len(newer_state)):
+    #     for j in range(len(newer_state[i])):
+    #         print(newer_state[i][j])
+
+    print("testing cipher: \n")
+    w = key_expansion(test_key, test_w)
+    state = [[0 for i in range(4)] for j in range(4)]
+    print_state(state)
+    k = 0
+    for col in range(len(state)):
+        for row in range(len(state[col])):
+            state[row][col] = test_inn[k]
+            k = k + 1
+
+    result = cipher(state, w)
+    for i in range(len(result)):
+        for j in range(len(result[i])):
+            print(result[i][j])
+
+
+def print_hex_pretty(state):
+    for i in range(len(state)):
+        for j in range(len(state[i])):
+            print(str(hex(state[j][i]).split('x')[-1]).zfill(2), end="")
+
+    print("\n")
 
 
 def main():
-    byarr = bytearray()
-    byarr.append(0x40)
-    byarr.append(0x50)
-    byarr.append(0x60)
-    byarr.append(0x70)
+    in_user = input("Enter text to encrypt or decrypt: ")
+    in_key = input("Enter your key: ")
+    in_key_size = input("Enter the size of your key (128, 192, 256): ")
+    is_encrypt = input("Enter (e) to encrypt, (d) to decrypt: ")
 
-    print(byarr.hex())
-    print(sub_word(byarr).hex())
+    in_array = bytes.fromhex(in_user)
+    in_key_array = bytes.fromhex(in_key)
 
-    help = bytearray.fromhex(r_con[2])
-    help2 = bytearray.fromhex("09cf4f3c")
-    xor = xor_bytearr(help, help2)
-    print("xored hex: \n")
-    print(xor.hex())
-    print("bytearray to hex: \n")
-    print(help.hex())
+    if in_key_size == "128":
+        nk = 4
+        nr = 10
+    elif in_key_size == "192":
+        nk = 6
+        nr = 12
+    elif in_key_size == "256":
+        nk = 8
+        nr = 14
 
-    print("given: \n")
-    print(test_expanded)
-    print("new: \n")
-    new_key = key_expansion(test_key, test_w)
-    for key in new_key:
-        print(key.hex())
+    test_w = [None] * (nb * (nr+1))
+    w = key_expansion(in_key_array, test_w, nk)
 
-    print("sub_bytes_test: \n")
-    new_state = sub_bytes(test_state)
-    for i in range(len(new_state)):
-        for j in range(len(new_state[i])):
-            print(new_state[i][j])
+    state = [[0 for i in range(4)] for j in range(4)]
+    k = 0
+    for col in range(len(state)):
+        for row in range(len(state[col])):
+            state[row][col] = in_array[k]
+            k = k + 1
 
-    print("shift_bytes_test: \n")
-    new_state = shift_rows(test_state)
-    for i in range(len(new_state)):
-        for j in range(len(new_state[i])):
-            print(new_state[i][j])
+    if is_encrypt == "e":
+        result = cipher(state, w, in_key_size)
+    else:
+        result = inv_cipher(state, w, in_key_size)
 
-    
-    return 0 
+    result_hex = list()
+    for i in range(len(result)):
+        for j in range(len(result[i])):
+            result_hex.append(hex(result[j][i]).split('x')[-1])
+
+    for h in result_hex:
+        print(str(h).zfill(2), end="")
+    print("\n")
 
 
 if __name__=="__main__":
